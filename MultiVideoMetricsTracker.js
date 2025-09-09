@@ -1,6 +1,6 @@
 class MultiVideoMetricsTracker {
   constructor(videos, numberOfSeconds = 1, eventName = 'videometrics') {
-    this.videoMap = new Map(); // videoElement => state
+    this.videoMap = new Map(); // videoElement => state+handlers
     this.intervalSeconds = numberOfSeconds;
     this.eventName = eventName;
 
@@ -12,13 +12,30 @@ class MultiVideoMetricsTracker {
     } else if (videos instanceof HTMLVideoElement) {
       videoList = [videos];
     }
-    videoList.forEach(video => this._initVideo(video));
+    videoList.forEach(video => this.addVideo(video));
 
     [
       'fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'
     ].forEach(eventName => {
       document.addEventListener(eventName, this._handleFullscreen);
     });
+
+    // Stop tracking if tab is hidden
+    window.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') {
+        this.videoMap.forEach((_, video) => this._stopTracking(video));
+      }
+    });
+
+    // Auto-remove videos that are deleted from DOM
+    this.observer = new MutationObserver(() => {
+      this.videoMap.forEach((_, video) => {
+        if (!document.body.contains(video)) {
+          this.removeVideo(video);
+        }
+      });
+    });
+    this.observer.observe(document.body, { childList: true, subtree: true });
 
     this.intervalId = setInterval(this._intervalUpdate, this.intervalSeconds * 1000);
   }
@@ -28,41 +45,76 @@ class MultiVideoMetricsTracker {
     rw_seek_count: 0,
     replay_count: 0,
     fs_count: 0,
-    percentage_elapsed: 0,
-    percentage_unique_seconds_viewed: 0,
-    watch_time_sec: 0,
-    on_screen_sec: 0,
+    unique_viewed_sec: 0,
+    percentage_unique_viewed: 0,
+    total_watch_time_sec: 0,
+    percent_max_progress: 0,
     duration_sec: 0,
     current_time_sec: 0
   });
 
-  _initVideo = (video) => {
-    this.videoMap.set(video, {
+  addVideo = (video) => {
+    if (this.videoMap.has(video)) return; // Already tracked
+
+    // State
+    const state = {
       metrics: this._getInitialMetrics(),
-      metadata_loaded: 0,
+      metadata_loaded: 1,
       playedback_unique_seconds: new Set(),
       playedback_max_sec: 0,
       video_visibility: 0,
       lastStart: null,
       playbackTime: 0,
-      watched_segment: 0
-    });
+      lastPlaybackTime: 0
+    };
 
-    video.addEventListener('loadedmetadata', () => {
-      this.videoMap.get(video).metadata_loaded = 1;
-    });
-    ['play', 'timeupdate'].forEach(ev =>
-      video.addEventListener(ev, () => this._startTracking(video))
-    );
-    ['pause', 'ended', 'waiting'].forEach(ev =>
-      video.addEventListener(ev, () => this._stopTracking(video))
-    );
-    ['seeking'].forEach(ev =>
-      video.addEventListener(ev, () => this._trackSeeks(video))
-    );
+    // Handlers (need to be same ref for removal)
+    const onLoadedMetadata = () => { state.metadata_loaded = 1; };
+    const onPlay = () => this._startTracking(video);
+    const onTimeupdate = () => this._startTracking(video); // Ensures lastStart is set on first timeupdate after play
+    const onPause = () => this._stopTracking(video);
+    const onEnded = () => this._stopTracking(video);
+    const onWaiting = () => this._stopTracking(video);
+    const onSeeking = () => this._trackSeeks(video);
+    const onReplayPlay = () => this._checkReplay(video);
+    const onReplaySeeked = () => this._checkReplay(video);
 
-    // For robustness, set loaded flag
-    this.videoMap.get(video).metadata_loaded = 1;
+    // Attach
+    video.addEventListener('loadedmetadata', onLoadedMetadata);
+    video.addEventListener('play', onPlay);
+    video.addEventListener('timeupdate', onTimeupdate);
+    video.addEventListener('pause', onPause);
+    video.addEventListener('ended', onEnded);
+    video.addEventListener('waiting', onWaiting);
+    video.addEventListener('seeking', onSeeking);
+    video.addEventListener('play', onReplayPlay);
+    video.addEventListener('seeked', onReplaySeeked);
+
+    // Save state + handlers
+    this.videoMap.set(video, {
+      ...state,
+      handlers: {
+        onLoadedMetadata, onPlay, onTimeupdate, onPause, onEnded, onWaiting, onSeeking, onReplayPlay, onReplaySeeked
+      }
+    });
+  };
+
+  removeVideo = (video) => {
+    const state = this.videoMap.get(video);
+    if (!state) return;
+
+    const h = state.handlers;
+    video.removeEventListener('loadedmetadata', h.onLoadedMetadata);
+    video.removeEventListener('play', h.onPlay);
+    video.removeEventListener('timeupdate', h.onTimeupdate);
+    video.removeEventListener('pause', h.onPause);
+    video.removeEventListener('ended', h.onEnded);
+    video.removeEventListener('waiting', h.onWaiting);
+    video.removeEventListener('seeking', h.onSeeking);
+    video.removeEventListener('play', h.onReplayPlay);
+    video.removeEventListener('seeked', h.onReplaySeeked);
+
+    this.videoMap.delete(video);
   };
 
   _isPlaying = (video) =>
@@ -86,14 +138,19 @@ class MultiVideoMetricsTracker {
 
   _startTracking = (video) => {
     const state = this.videoMap.get(video);
-    state.lastStart = video.currentTime;
+    if (state.lastStart === null) {
+      state.lastStart = video.currentTime;
+    }
   };
 
   _stopTracking = (video) => {
     const state = this.videoMap.get(video);
-    state.lastStart = null;
-    state.playbackTime += state.watched_segment;
-    state.metrics.watch_time_sec = state.playbackTime;
+    if (state.lastStart !== null) {
+      const delta = video.currentTime - state.lastStart;
+      if (delta > 0) state.playbackTime += delta;
+      state.metrics.total_watch_time_sec = state.playbackTime;
+      state.lastStart = null;
+    }
   };
 
   _trackSeeks = (video) => {
@@ -118,6 +175,18 @@ class MultiVideoMetricsTracker {
     });
   };
 
+  _checkReplay = (video) => {
+    const state = this.videoMap.get(video);
+    if (
+      state.lastPlaybackTime !== undefined &&
+      state.lastPlaybackTime > 1 &&
+      video.currentTime < 1
+    ) {
+      state.metrics.replay_count++;
+    }
+    state.lastPlaybackTime = video.currentTime;
+  };
+
   _intervalUpdate = () => {
     this.videoMap.forEach((state, video) => {
       if (state.metadata_loaded) {
@@ -127,14 +196,13 @@ class MultiVideoMetricsTracker {
         state.video_visibility = this._isVisibleAndPlaying(video);
         if (state.video_visibility) {
           state.playedback_unique_seconds.add(Math.floor(state.metrics.current_time_sec));
-          state.metrics.on_screen_sec = state.playedback_unique_seconds.size;
-          state.metrics.percentage_unique_seconds_viewed =
-            (state.metrics.on_screen_sec > 0 && state.metrics.duration_sec > 0)
-              ? Number((state.metrics.on_screen_sec / state.metrics.duration_sec).toFixed(2)) : 0;
-          state.metrics.percentage_elapsed =
+          state.metrics.unique_viewed_sec = state.playedback_unique_seconds.size;
+          state.metrics.percentage_unique_viewed =
+            (state.metrics.unique_viewed_sec > 0 && state.metrics.duration_sec > 0)
+              ? Number((state.metrics.unique_viewed_sec / state.metrics.duration_sec).toFixed(2)) : 0;
+          state.metrics.percent_max_progress =
             (state.playedback_max_sec > 0 && state.metrics.duration_sec > 0)
               ? Number((state.playedback_max_sec / state.metrics.duration_sec).toFixed(2)) : 0;
-          state.watched_segment = video.currentTime - state.lastStart;
         }
         // Dispatch a custom event on the video element
         video.dispatchEvent(
@@ -163,5 +231,9 @@ class MultiVideoMetricsTracker {
     }));
 
   /** Stop all intervals/cleanup */
-  destroy = () => clearInterval(this.intervalId);
+  destroy = () => {
+    clearInterval(this.intervalId);
+    if (this.observer) this.observer.disconnect();
+    this.videoMap.forEach((_, video) => this.removeVideo(video));
+  };
 }
