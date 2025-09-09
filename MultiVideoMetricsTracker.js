@@ -56,10 +56,10 @@ class MultiVideoMetricsTracker {
       });
     });
     this.observer.observe(document.body, { childList: true, subtree: true });
-
+    this.session_created_at = new Date();
     this.intervalId = setInterval(this._intervalUpdate, this.intervalSeconds * 1000);
   }
-
+  
   _getInitialMetrics = () => ({
     ff_seek_count: 0,
     rw_seek_count: 0,
@@ -70,7 +70,8 @@ class MultiVideoMetricsTracker {
     total_watch_time_sec: 0,
     percent_max_progress: 0,
     duration_sec: 0,
-    current_time_sec: 0
+    current_time_sec: 0,
+    session_time: 0
   });
 
   addVideo = (video) => {
@@ -85,7 +86,8 @@ class MultiVideoMetricsTracker {
       video_visibility: 0,
       lastStart: null,
       playbackTime: 0,
-      lastPlaybackTime: 0
+      lastPlaybackTime: 0,
+      session_time_start: new Date()
     };
 
     // Handlers (need to be same ref for removal)
@@ -223,6 +225,8 @@ class MultiVideoMetricsTracker {
           state.metrics.percent_max_progress =
             (state.playedback_max_sec > 0 && state.metrics.duration_sec > 0)
               ? Number((state.playedback_max_sec / state.metrics.duration_sec).toFixed(2)) : 0;
+            state.metrics.session_time = Number(((new Date()- state.session_time_start)/1000).toFixed(2));
+          
         }
         // Dispatch a custom event on the video element
         video.dispatchEvent(
@@ -236,7 +240,6 @@ class MultiVideoMetricsTracker {
       }
     });
   };
-
   /** Get all video elements being tracked */
   getVideos = () => Array.from(this.videoMap.keys());
 
