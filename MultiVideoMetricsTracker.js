@@ -1,3 +1,23 @@
+/**
+ * MultiVideoMetricsTracker
+ *
+ * Tracks playback metrics for multiple video elements in real time.
+ * Reports events such as time watched, fullscreen toggles, and user engagement,
+ * at configurable intervals. Supports automatic setup from selector, NodeList, or single video element.
+ *
+ * Author: Yehia Shouman (info@yehiashouman.com)
+ * License: GPL-3.0
+ *
+ * Usage:
+ *   const tracker = new MultiVideoMetricsTracker('video.selector', 1, 'videometrics');
+ *
+ * Features:
+ *   - Tracks play time, watch percentage, and fullscreen state
+ *   - Emits events for analytics or custom handlers
+ *   - Handles edge cases like skipping, seeking, or fast-forwarding
+ *
+ * See README.md for detailed integration instructions.
+ */
 class MultiVideoMetricsTracker {
   constructor(videos, numberOfSeconds = 1, eventName = 'videometrics') {
     this.videoMap = new Map(); // videoElement => state+handlers
