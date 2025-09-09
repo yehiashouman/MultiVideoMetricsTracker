@@ -116,7 +116,7 @@ new MultiVideoMetricsTracker(videos, numberOfSeconds = 1, eventName = 'videometr
 }
 ```
 ## License
-GPL-3.0 license
-
+This project is licensed under the GNU General Public License v3.0 (GPL‑3.0).  
+See the full text of the license here: [GNU GPL v3](https://www.gnu.org/licenses/gpl-3.0.en.html)
 
   
