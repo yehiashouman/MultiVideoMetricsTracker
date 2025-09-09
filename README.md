@@ -18,7 +18,8 @@ Provides rich video engagement metrics (seek counts, watch time, unique seconds 
   - Total watch time 
   - Unique seconds actually visible on screen 
   - Video duration  
-  - Current time  
+  - Current time
+  - Session Time
 - Easily get all tracked metrics from JS
 
 ---
@@ -112,7 +113,8 @@ new MultiVideoMetricsTracker(videos, numberOfSeconds = 1, eventName = 'videometr
   total_watch_time_sec,                    // Total watch time including rewinded segments
   unique_viewed_sec,                     // Unique playback seconds where video is within viewport and visible (counted one time regardless of replay)
   duration_sec,                      // Video duration
-  current_time_sec                   // Current time in video
+  current_time_sec,                   // Current time in video,
+  session_time_sec                     //Since tracker is tracking video (usually as page is loaded)
 }
 ```
 ## License
