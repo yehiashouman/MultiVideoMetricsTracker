@@ -13,10 +13,10 @@ Provides rich video engagement metrics (seek counts, watch time, unique seconds 
   - Forward/reverse seek count  
   - Replay count  
   - Fullscreen count  
-  - Percentage elapsed  
-  - Percentage of unique seconds viewed  
-  - Total watch time  
-  - Unique seconds actually visible on screen  
+  - Percentage of Max progress 
+  - Percentage of unique seconds viewed
+  - Total watch time 
+  - Unique seconds actually visible on screen 
   - Video duration  
   - Current time  
 - Easily get all tracked metrics from JS
@@ -56,7 +56,28 @@ const tracker = new MultiVideoMetricsTracker('video.tracked', 1); // selector st
 const tracker = new MultiVideoMetricsTracker(document.querySelector('#mainVideo'));
 ```
 
-### 5. Get metrics directly from code
+
+### 5. Dynamically Add a Video
+You can add a new video element to tracking at any time:
+```js
+const video = document.createElement('video');
+document.body.appendChild(video);
+tracker.addVideo(video);
+```
+
+### 6. Remove a Video from Tracking
+> **Note:**
+> You can remove a video from tracking and clean up all associated event listeners:
+> If a tracked video element is removed from the DOM (e.g., by calling video.remove() or manipulating the DOM),
+> the class will automatically stop tracking it and clean up all event listeners.
+> This is handled internally with a MutationObserver.
+> You do not need to call removeVideo in most cases.
+```js
+tracker.removeVideo(video);
+```
+
+
+### 7. Get metrics directly from code
 ```js
 const video = document.querySelector('video');
 console.log(tracker.getMetrics(video)); // returns metrics object
@@ -64,7 +85,9 @@ console.log(tracker.getMetrics(video)); // returns metrics object
 console.log(tracker.getAllMetrics()); // returns [{video, metrics}, ...]
 ```
 
-### 6. Stop tracking
+
+### 8. Stop tracking
+To stop all tracking, interval timers, observers, and listeners, call:
 ```js
 tracker.destroy();
 ```
@@ -84,10 +107,10 @@ new MultiVideoMetricsTracker(videos, numberOfSeconds = 1, eventName = 'videometr
   rw_seek_count,                     // Reverse seek action count
   replay_count,                      // (not yet used)
   fs_count,                          // Entering Fullscreen mode count
-  percentage_elapsed,                // Max viewed second / duration
-  percentage_unique_seconds_viewed,  // Percentage of video actually viewed = (Unique seconds watched / video duration  (without repetition and with video within viewport and tab is active))
-  watch_time_sec,                    // Total watch time including rewinds
-  on_screen_sec,                     // Unique playback seconds where video is within viewport and visible
+  percent_max_progress,                // Furthest progress in the video (Can happen even by skipping) / duration
+  percentage_unique_viewed,  // Percentage of seconds of the video actually viewed = (Unique seconds watched / video duration  (unique seconds are counted one time and with video within viewport and tab is active))
+  total_watch_time_sec,                    // Total watch time including rewinded segments
+  unique_viewed_sec,                     // Unique playback seconds where video is within viewport and visible (counted one time regardless of replay)
   duration_sec,                      // Video duration
   current_time_sec                   // Current time in video
 }
