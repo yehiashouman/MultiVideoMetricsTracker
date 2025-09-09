@@ -80,14 +80,14 @@ new MultiVideoMetricsTracker(videos, numberOfSeconds = 1, eventName = 'videometr
 ## Metrics object
 ```js
 {
-  ff_seek_count,                     // Forward seek count
-  rw_seek_count,                     // Reverse seek count
+  ff_seek_count,                     // Forward seek action count
+  rw_seek_count,                     // Reverse seek action count
   replay_count,                      // (not yet used)
-  fs_count,                          // Fullscreen count
+  fs_count,                          // Entering Fullscreen mode count
   percentage_elapsed,                // Max viewed second / duration
-  percentage_unique_seconds_viewed,  // Unique seconds watched / duration
+  percentage_unique_seconds_viewed,  // Percentage of video actually viewed = (Unique seconds watched / video duration  (without repetition and with video within viewport and tab is active))
   watch_time_sec,                    // Total watch time including rewinds
-  on_screen_sec,                     // Unique playback seconds visible
+  on_screen_sec,                     // Unique playback seconds where video is within viewport and visible
   duration_sec,                      // Video duration
   current_time_sec                   // Current time in video
 }
