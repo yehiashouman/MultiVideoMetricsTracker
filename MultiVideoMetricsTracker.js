@@ -71,7 +71,7 @@ class MultiVideoMetricsTracker {
     percent_max_progress: 0,
     duration_sec: 0,
     current_time_sec: 0,
-    session_time: 0
+    session_time_sec: 0
   });
 
   addVideo = (video) => {
@@ -225,7 +225,7 @@ class MultiVideoMetricsTracker {
           state.metrics.percent_max_progress =
             (state.playedback_max_sec > 0 && state.metrics.duration_sec > 0)
               ? Number((state.playedback_max_sec / state.metrics.duration_sec).toFixed(2)) : 0;
-            state.metrics.session_time = Number(((new Date()- state.session_time_start)/1000).toFixed(2));
+            state.metrics.session_time_sec = Number(((new Date()- state.session_time_start)/1000).toFixed(2));
           
         }
         // Dispatch a custom event on the video element
